@@ -28,6 +28,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -36,6 +37,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.programmersbox.yugiohcalculator.ui.theme.Alizarin
+import com.programmersbox.yugiohcalculator.ui.theme.Emerald
+import com.programmersbox.yugiohcalculator.ui.theme.Sunflower
 import com.programmersbox.yugiohcalculator.ui.theme.YugiohCalculatorTheme
 import kotlinx.coroutines.delay
 import kotlin.math.absoluteValue
@@ -104,6 +108,9 @@ fun YugiohView(vm: YugiohViewModel = viewModel()) {
                     modifier = Modifier
                         .padding(horizontal = 4.dp)
                         .weight(1f),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = SolidColor(animateColorAsState(targetValue = vm.playerOne.lpColor).value)
+                    )
                 ) {
                     ListItem(
                         overlineText = { Text("Player 1") },
@@ -115,6 +122,9 @@ fun YugiohView(vm: YugiohViewModel = viewModel()) {
                     modifier = Modifier
                         .padding(horizontal = 4.dp)
                         .weight(1f),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = SolidColor(animateColorAsState(targetValue = vm.playerTwo.lpColor).value)
+                    )
                 ) {
                     ListItem(
                         overlineText = { Text("Player 2") },
@@ -265,11 +275,14 @@ fun ChangeLPDialog(
                             colors = CardDefaults.outlinedCardColors(
                                 containerColor = animateColorAsState(if (vm.lpChangePlayerSelected == Players.PlayerOne) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface).value,
                                 contentColor = animateColorAsState(if (vm.lpChangePlayerSelected == Players.PlayerOne) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primary).value
+                            ),
+                            border = CardDefaults.outlinedCardBorder().copy(
+                                brush = SolidColor(animateColorAsState(vm.playerOne.lpColor).value)
                             )
                         ) {
                             ListItem(
                                 overlineText = { Text("Player 1") },
-                                headlineText = { Text(animateIntAsState(targetValue = vm.playerOne).value.toString()) }
+                                headlineText = { Text(animateIntAsState(vm.playerOne).value.toString()) }
                             )
                         }
 
@@ -281,11 +294,14 @@ fun ChangeLPDialog(
                             colors = CardDefaults.outlinedCardColors(
                                 containerColor = animateColorAsState(if (vm.lpChangePlayerSelected == Players.PlayerTwo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface).value,
                                 contentColor = animateColorAsState(if (vm.lpChangePlayerSelected == Players.PlayerTwo) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primary).value
+                            ),
+                            border = CardDefaults.outlinedCardBorder().copy(
+                                brush = SolidColor(animateColorAsState(vm.playerTwo.lpColor).value)
                             )
                         ) {
                             ListItem(
                                 overlineText = { Text("Player 2") },
-                                headlineText = { Text(animateIntAsState(targetValue = vm.playerTwo).value.toString()) }
+                                headlineText = { Text(animateIntAsState(vm.playerTwo).value.toString()) }
                             )
                         }
                     }
@@ -533,6 +549,13 @@ fun Coin(coin: Coin, modifier: Modifier = Modifier, onClick: () -> Unit) {
         }
     }
 }
+
+val Int.lpColor
+    get() = when {
+        this >= 6000 -> Emerald
+        this in 3000..6000 -> Sunflower
+        else -> Alizarin
+    }
 
 class YugiohViewModel : ViewModel() {
 
