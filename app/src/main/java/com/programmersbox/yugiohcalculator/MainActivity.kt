@@ -9,12 +9,12 @@ import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.CornerBasedShape
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -28,7 +28,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -39,6 +38,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.programmersbox.yugiohcalculator.ui.theme.YugiohCalculatorTheme
 import kotlinx.coroutines.delay
+import kotlin.math.absoluteValue
 import kotlin.random.Random
 import kotlin.random.nextInt
 
@@ -60,44 +60,160 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun YugiohView(vm: YugiohViewModel = viewModel()) {
-    DiceDialog(visible = vm.showDiceDialog, onDismissRequest = { vm.showDiceDialog = false })
-    CoinFlipDialog(visible = vm.showCoinFlipDialog, onDismissRequest = { vm.showCoinFlipDialog = false })
+    DiceDialog(
+        visible = vm.showDiceDialog,
+        onDismissRequest = { vm.showDiceDialog = false }
+    )
+    CoinFlipDialog(
+        visible = vm.showCoinFlipDialog,
+        onDismissRequest = { vm.showCoinFlipDialog = false }
+    )
     ChangeLPDialog(
         visible = vm.showLPChangeDialog,
         onDismissRequest = { vm.showLPChangeDialog = false },
+        vm = vm
+    )
+    ResetLPDialog(
+        visible = vm.showResetLPDialog,
+        onDismissRequest = { vm.showResetLPDialog = false },
+        vm = vm
+    )
+    ResetLogsDialog(
+        visible = vm.showResetLogDialog,
+        onDismissRequest = { vm.showResetLogDialog = false },
         vm = vm
     )
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                navigationIcon = { Text("Player 1 LP:") },
-                title = { Text(animateIntAsState(targetValue = vm.playerOne).value.toString()) }
-            )
-        },
-        bottomBar = {
-            CenterAlignedTopAppBar(
-                navigationIcon = { Text("Player 2 LP:") },
-                title = { Text(animateIntAsState(targetValue = vm.playerTwo).value.toString()) }
+                title = { Text("Yu-Gi-Oh Calculator") }
             )
         }
     ) { p ->
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            contentPadding = p
+        Column(
+            modifier = Modifier.padding(p),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            item { OutlinedButton(onClick = { vm.showDiceDialog = true }) { Text("Roll Dice") } }
-            item {
-                OutlinedButton(onClick = {
-                    vm.showCoinFlipDialog = true
-                }) { Text("Flip Coin") }
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+
+                OutlinedCard(
+                    modifier = Modifier
+                        .padding(horizontal = 4.dp)
+                        .weight(1f),
+                ) {
+                    ListItem(
+                        overlineText = { Text("Player 1") },
+                        headlineText = { Text(animateIntAsState(targetValue = vm.playerOne).value.toString()) }
+                    )
+                }
+
+                OutlinedCard(
+                    modifier = Modifier
+                        .padding(horizontal = 4.dp)
+                        .weight(1f),
+                ) {
+                    ListItem(
+                        overlineText = { Text("Player 2") },
+                        headlineText = { Text(animateIntAsState(targetValue = vm.playerTwo).value.toString()) }
+                    )
+                }
             }
-            item {
-                OutlinedButton(onClick = {
-                    vm.showLPChangeDialog = true
-                }) { Text("Change LP") }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    onClick = { vm.showDiceDialog = true }
+                ) { Text("Roll Dice") }
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    onClick = { vm.showCoinFlipDialog = true }
+                ) { Text("Flip Coin") }
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    onClick = { vm.showLPChangeDialog = true }
+                ) { Text("Change LP") }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                OutlinedButton(
+                    onClick = { vm.showResetLPDialog = true }
+                ) { Text("Reset LP") }
+                OutlinedButton(
+                    onClick = { vm.showResetLogDialog = true }
+                ) { Text("Reset Logs") }
+            }
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                items(vm.logs) {
+                    ElevatedCard {
+                        ListItem(
+                            headlineText = { Text(it) }
+                        )
+                    }
+                }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+fun ResetLPDialog(
+    visible: Boolean,
+    onDismissRequest: () -> Unit,
+    vm: YugiohViewModel
+) {
+    if (visible) {
+        AlertDialog(
+            onDismissRequest = onDismissRequest,
+            title = { Text("Reset LP?") },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            text = { Text("Are you sure you want to reset LP?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDismissRequest()
+                        vm.resetLP()
+                    }
+                ) { Text("Yes") }
+            },
+            dismissButton = { TextButton(onClick = onDismissRequest) { Text("No") } }
+        )
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+fun ResetLogsDialog(
+    visible: Boolean,
+    onDismissRequest: () -> Unit,
+    vm: YugiohViewModel
+) {
+    if (visible) {
+        AlertDialog(
+            onDismissRequest = onDismissRequest,
+            title = { Text("Reset Logs?") },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            text = { Text("Are you sure you want to reset logs?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDismissRequest()
+                        vm.resetLogs()
+                    }
+                ) { Text("Yes") }
+            },
+            dismissButton = { TextButton(onClick = onDismissRequest) { Text("No") } }
+        )
     }
 }
 
@@ -407,7 +523,7 @@ fun Coin(coin: Coin, modifier: Modifier = Modifier, onClick: () -> Unit) {
             modifier = Modifier.fillMaxSize()
         ) {
             Text(
-                text = when(coin.value) {
+                text = when (coin.value) {
                     true -> "Heads"
                     false -> "Tails"
                 },
@@ -420,9 +536,10 @@ fun Coin(coin: Coin, modifier: Modifier = Modifier, onClick: () -> Unit) {
 class YugiohViewModel : ViewModel() {
 
     var playerOne by mutableStateOf(8000)
-        private set
     var playerTwo by mutableStateOf(8000)
-        private set
+
+    var showResetLPDialog by mutableStateOf(false)
+    var showResetLogDialog by mutableStateOf(false)
 
     var showDiceDialog by mutableStateOf(false)
     var showCoinFlipDialog by mutableStateOf(false)
@@ -431,11 +548,28 @@ class YugiohViewModel : ViewModel() {
     var lpChangePlayerSelected by mutableStateOf(Players.PlayerOne)
     var lpAddOrSubtract by mutableStateOf(AddOrSubtract.Subtract)
 
+    val logs = mutableStateListOf("Player 1: $playerOne - Player 2: $playerTwo")
+
+    fun resetLogs() {
+        logs.clear()
+        logs.add("Player 1: $playerOne - Player 2: $playerTwo")
+    }
+
+    fun resetLP() {
+        playerOne = 8000
+        playerTwo = 8000
+        logs.add("Player 1: $playerOne - Player 2: $playerTwo")
+    }
+
     private fun changePlayerOneLP(value: Int) {
+        val type = if (value < 0) "-" else "+"
+        logs.add("Player 1: $playerOne $type ${value.absoluteValue} = ${playerOne + value}")
         playerOne += value
     }
 
     private fun changePlayerTwoLP(value: Int) {
+        val type = if (value < 0) "-" else "+"
+        logs.add("Player 2: $playerTwo $type ${value.absoluteValue} = ${playerTwo + value}")
         playerTwo += value
     }
 
