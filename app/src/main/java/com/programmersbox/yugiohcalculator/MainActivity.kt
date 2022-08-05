@@ -322,7 +322,9 @@ fun ChangeLPDialog(
                             imeAction = ImeAction.Done
                         ),
                         keyboardActions = KeyboardActions(
-                            onDone = { amount.toIntOrNull()?.let(vm::changeLP) }
+                            onDone = {
+                                amount.toIntOrNull()?.let(vm::changeLP).also { amount = "" }
+                            }
                         ),
                         leadingIcon = {
                             IconToggleButton(
@@ -349,7 +351,7 @@ fun ChangeLPDialog(
                     )
 
                     Button(
-                        onClick = { amount.toIntOrNull()?.let(vm::changeLP) }
+                        onClick = { amount.toIntOrNull()?.let(vm::changeLP)?.also { amount = "" } }
                     ) { Text("Change LP!") }
                 }
             }
