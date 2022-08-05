@@ -26,7 +26,6 @@ import com.programmersbox.yugiohcalculator.ui.theme.Alizarin
 import com.programmersbox.yugiohcalculator.ui.theme.Emerald
 import com.programmersbox.yugiohcalculator.ui.theme.Sunflower
 
-
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ChangeLPDialog(
