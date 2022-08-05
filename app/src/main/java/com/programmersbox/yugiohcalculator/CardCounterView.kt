@@ -4,15 +4,15 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Delete
@@ -30,50 +30,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.programmersbox.yugiohcalculator.ui.theme.Emerald
 import com.programmersbox.yugiohcalculator.ui.theme.YugiohCalculatorTheme
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
-
-class CardCounterViewModel : ViewModel() {
-
-    var cards by mutableStateOf<List<CardInfo>>(emptyList())
-    var loadingState by mutableStateOf(NetworkLoadingState.Loading)
-
-    val cardList = mutableStateListOf<CardWithCounter>()
-
-    var showCardPicker by mutableStateOf(false)
-
-    fun loadCards() {
-        viewModelScope.launch {
-            if (cards.isEmpty()) {
-                loadingState = NetworkLoadingState.Loading
-                cards = runCatching { withTimeout(10000) { Networking.loadCards() } }
-                    .fold(
-                        onSuccess = {
-                            loadingState = NetworkLoadingState.Success
-                            it
-                        },
-                        onFailure = {
-                            it.printStackTrace()
-                            loadingState = NetworkLoadingState.Failure
-                            emptyList()
-                        }
-                    )
-            }
-        }
-    }
-
-}
-
-data class CardWithCounter(val cardInfo: CardInfo) {
-    var counter by mutableStateOf(0)
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,27 +64,66 @@ fun CardCounterView(vm: CardCounterViewModel = viewModel()) {
                         .padding(horizontal = 2.dp)
                 ) { Text("Add Card") }
             }
-            items(vm.cardList) { card ->
+            items(vm.cardList, key = { it.id ?: it.name ?: it.hashCode() }) { card ->
                 CounterItem(
-                    cardInfo = card.cardInfo,
-                    counterValue = card.counter,
-                    onAdd = { card.counter++ },
-                    onSubtract = { card.counter-- },
-                    onDelete = { vm.cardList.removeIf { it.cardInfo == card.cardInfo } }
+                    cardInfo = card,
+                    onDelete = { vm.cardList.remove(card) }
                 )
             }
         }
     }
 }
 
+@OptIn(
+    ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class
+)
 @Composable
 fun CounterItem(
     cardInfo: CardInfo,
-    counterValue: Int,
-    onAdd: () -> Unit,
-    onSubtract: () -> Unit,
     onDelete: () -> Unit
 ) {
+    var showDialog by remember { mutableStateOf(false) }
+    var counter by remember { mutableStateOf(0) }
+
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            confirmButton = { TextButton(onClick = { showDialog = false }) { Text("Done") } },
+            title = { Text(cardInfo.name.orEmpty()) },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Surface(onClick = { counter++ }) {
+                        AsyncImage(
+                            model = remember(counter) {
+                                ImageRequest.Builder(context)
+                                    .data(cardInfo.card_images?.randomOrNull()?.image_url.orEmpty())
+                                    .lifecycle(lifecycle)
+                                    .crossfade(true)
+                                    .build()
+                            },
+                            contentScale = ContentScale.Crop,
+                            contentDescription = cardInfo.name.orEmpty(),
+                        )
+                    }
+                    ListItem(
+                        overlineText = {
+                            Text("Atk/Def: ${cardInfo.atk}/${cardInfo.def} | Lvl: ${cardInfo.level}")
+                        },
+                        headlineText = { },
+                        supportingText = { Text(cardInfo.desc.orEmpty()) }
+                    )
+                }
+            }
+        )
+    }
+
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -134,8 +134,6 @@ fun CounterItem(
             horizontalArrangement = Arrangement.SpaceAround,
             modifier = Modifier.fillMaxWidth()
         ) {
-            val context = LocalContext.current
-            val lifecycle = LocalLifecycleOwner.current
             AsyncImage(
                 model = remember {
                     ImageRequest.Builder(context)
@@ -146,20 +144,23 @@ fun CounterItem(
                 },
                 contentScale = ContentScale.Crop,
                 contentDescription = cardInfo.name.orEmpty(),
-                modifier = Modifier.align(Alignment.CenterVertically)
+                modifier = Modifier
+                    .clickable { showDialog = true }
+                    .align(Alignment.CenterVertically)
             )
+            var counterCount by remember { mutableStateOf(0) }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(
-                    onClick = onSubtract,
+                    onClick = { counterCount-- },
                 ) { Icon(Icons.Default.RemoveCircle, null) }
                 Text(
-                    counterValue.toString(),
+                    counterCount.toString(),
                     textAlign = TextAlign.Center
                 )
                 IconButton(
-                    onClick = onAdd,
+                    onClick = { counterCount++ },
                 ) { Icon(Icons.Default.AddCircle, null) }
             }
 
@@ -214,12 +215,11 @@ fun ChooseCardDialog(
                                     items(
                                         vm.cards.filter { it.name?.contains(search, true) == true }
                                     ) { card ->
-                                        val isContained = vm.cardList.any { it.cardInfo == card }
+                                        val isContained = vm.cardList.any { it == card }
                                         Surface(
                                             onClick = {
-                                                if (isContained)
-                                                    vm.cardList.removeIf { it.cardInfo == card }
-                                                else vm.cardList.add(CardWithCounter(card))
+                                                if (isContained) vm.cardList.remove(card)
+                                                else vm.cardList.add(card)
                                             },
                                             border = BorderStroke(
                                                 animateDpAsState(targetValue = if (isContained) 4.dp else 0.dp).value,
@@ -228,7 +228,7 @@ fun ChooseCardDialog(
                                         ) {
                                             AsyncImage(
                                                 model = ImageRequest.Builder(LocalContext.current)
-                                                    .data(card.card_images?.randomOrNull()?.image_url_small.orEmpty())
+                                                    .data(card.card_images?.randomOrNull()?.image_url.orEmpty())
                                                     .lifecycle(LocalLifecycleOwner.current)
                                                     .crossfade(true)
                                                     .build(),
@@ -274,10 +274,7 @@ fun CounterItemPreview() {
                 race = null,
                 card_images = emptyList()
             ),
-            counterValue = 1,
-            onAdd = {},
             onDelete = {},
-            onSubtract = {}
         )
     }
 }

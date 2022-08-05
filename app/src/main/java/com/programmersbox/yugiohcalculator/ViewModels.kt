@@ -5,9 +5,43 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlin.math.absoluteValue
 import kotlin.random.Random
 import kotlin.random.nextInt
+
+class CardCounterViewModel : ViewModel() {
+
+    var cards by mutableStateOf<List<CardInfo>>(emptyList())
+    var loadingState by mutableStateOf(NetworkLoadingState.Loading)
+
+    val cardList = mutableStateListOf<CardInfo>()
+
+    var showCardPicker by mutableStateOf(false)
+
+    fun loadCards() {
+        viewModelScope.launch {
+            if (cards.isEmpty()) {
+                loadingState = NetworkLoadingState.Loading
+                cards = runCatching { withTimeout(10000) { Networking.loadCards() } }
+                    .fold(
+                        onSuccess = {
+                            loadingState = NetworkLoadingState.Success
+                            it
+                        },
+                        onFailure = {
+                            it.printStackTrace()
+                            loadingState = NetworkLoadingState.Failure
+                            emptyList()
+                        }
+                    )
+            }
+        }
+    }
+
+}
 
 class CoinFlipViewModel : ViewModel() {
 
