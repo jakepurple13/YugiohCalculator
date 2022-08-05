@@ -1,7 +1,13 @@
 package com.programmersbox.yugiohcalculator
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -16,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -28,8 +35,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.programmersbox.yugiohcalculator.ui.theme.Emerald
 import com.programmersbox.yugiohcalculator.ui.theme.YugiohCalculatorTheme
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 class CardCounterViewModel : ViewModel() {
 
@@ -40,14 +49,22 @@ class CardCounterViewModel : ViewModel() {
 
     var showCardPicker by mutableStateOf(false)
 
-    init {
-        loadCards()
-    }
-
     fun loadCards() {
         viewModelScope.launch {
-            if (cards.isNotEmpty()) {
-                cards = Networking.loadCards { loadingState = it }
+            if (cards.isEmpty()) {
+                loadingState = NetworkLoadingState.Loading
+                cards = runCatching { withTimeout(10000) { Networking.loadCards() } }
+                    .fold(
+                        onSuccess = {
+                            loadingState = NetworkLoadingState.Success
+                            it
+                        },
+                        onFailure = {
+                            it.printStackTrace()
+                            loadingState = NetworkLoadingState.Failure
+                            emptyList()
+                        }
+                    )
             }
         }
     }
@@ -112,44 +129,44 @@ fun CounterItem(
             .fillMaxWidth()
             .padding(horizontal = 4.dp)
     ) {
-        Row {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceAround,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            val context = LocalContext.current
+            val lifecycle = LocalLifecycleOwner.current
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(cardInfo.card_images?.randomOrNull()?.image_url.orEmpty())
-                    .lifecycle(LocalLifecycleOwner.current)
-                    .crossfade(true)
-                    .build(),
+                model = remember {
+                    ImageRequest.Builder(context)
+                        .data(cardInfo.card_images?.randomOrNull()?.image_url.orEmpty())
+                        .lifecycle(lifecycle)
+                        .crossfade(true)
+                        .build()
+                },
                 contentScale = ContentScale.Crop,
                 contentDescription = cardInfo.name.orEmpty(),
                 modifier = Modifier.align(Alignment.CenterVertically)
             )
-
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 16.dp, top = 4.dp)
             ) {
                 IconButton(
                     onClick = onSubtract,
-                    modifier = Modifier.weight(1f)
                 ) { Icon(Icons.Default.RemoveCircle, null) }
                 Text(
                     counterValue.toString(),
-                    modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
                 IconButton(
                     onClick = onAdd,
-                    modifier = Modifier.weight(1f)
                 ) { Icon(Icons.Default.AddCircle, null) }
             }
 
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Top)
-                    .padding(horizontal = 2.dp)
-            ) { IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, null) } }
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.padding(horizontal = 2.dp)
+            ) { Icon(Icons.Default.Delete, null) }
         }
     }
 }
@@ -162,6 +179,7 @@ fun ChooseCardDialog(
     vm: CardCounterViewModel
 ) {
     if (visible) {
+        LaunchedEffect(Unit) { vm.loadCards() }
         AlertDialog(
             properties = DialogProperties(usePlatformDefaultWidth = false),
             onDismissRequest = onDismissRequest,
@@ -174,19 +192,50 @@ fun ChooseCardDialog(
                             CircularProgressIndicator()
                         }
                         NetworkLoadingState.Success -> {
-                            LazyVerticalGrid(columns = GridCells.Fixed(3)) {
-                                items(vm.cards) { card ->
-                                    Surface(onClick = { vm.cardList.add(CardWithCounter(card)) }) {
-                                        /*AsyncImage(
-                                            model = ImageRequest.Builder(LocalContext.current)
-                                                .data(card.card_images?.randomOrNull()?.image_url.orEmpty())
-                                                .lifecycle(LocalLifecycleOwner.current)
-                                                .crossfade(true)
-                                                .build(),
-                                            contentScale = ContentScale.Crop,
-                                            contentDescription = card.name.orEmpty(),
-                                        )*/
-                                        Text(card.name.orEmpty())
+                            var search by remember { mutableStateOf("") }
+
+                            Scaffold(
+                                bottomBar = {
+                                    BottomAppBar {
+                                        OutlinedTextField(
+                                            value = search,
+                                            onValueChange = { search = it },
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+                                }
+                            ) { p ->
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(3),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                    contentPadding = p
+                                ) {
+                                    items(
+                                        vm.cards.filter { it.name?.contains(search, true) == true }
+                                    ) { card ->
+                                        val isContained = vm.cardList.any { it.cardInfo == card }
+                                        Surface(
+                                            onClick = {
+                                                if (isContained)
+                                                    vm.cardList.removeIf { it.cardInfo == card }
+                                                else vm.cardList.add(CardWithCounter(card))
+                                            },
+                                            border = BorderStroke(
+                                                animateDpAsState(targetValue = if (isContained) 4.dp else 0.dp).value,
+                                                animateColorAsState(targetValue = if (isContained) Emerald else Color.Transparent).value
+                                            )
+                                        ) {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(LocalContext.current)
+                                                    .data(card.card_images?.randomOrNull()?.image_url_small.orEmpty())
+                                                    .lifecycle(LocalLifecycleOwner.current)
+                                                    .crossfade(true)
+                                                    .build(),
+                                                contentScale = ContentScale.Crop,
+                                                contentDescription = card.name.orEmpty(),
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -219,7 +268,7 @@ fun CounterItemPreview() {
         CounterItem(
             cardInfo = CardInfo(
                 id = null,
-                name = null,
+                name = "Dark Magician",
                 type = null,
                 desc = null,
                 race = null,

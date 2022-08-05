@@ -2,14 +2,18 @@ package com.programmersbox.yugiohcalculator
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
@@ -18,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.programmersbox.yugiohcalculator.ui.theme.YugiohCalculatorTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,8 +66,16 @@ fun YugiohView(vm: YugiohViewModel = viewModel()) {
         vm = vm
     )
 
+    val scope = rememberCoroutineScope()
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+
+    BackHandler(drawerState.isOpen) {
+        scope.launch { drawerState.close() }
+    }
+
     ModalNavigationDrawer(
-        drawerContent = { CardCounterView() }
+        drawerContent = { CardCounterView() },
+        drawerState = drawerState
     ) {
         Scaffold(
             topBar = {
@@ -108,33 +121,41 @@ fun YugiohView(vm: YugiohViewModel = viewModel()) {
                         )
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
+
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    OutlinedButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = { vm.showDiceDialog = true }
-                    ) { Text("Roll Dice") }
-                    OutlinedButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = { vm.showCoinFlipDialog = true }
-                    ) { Text("Flip Coin") }
-                    OutlinedButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = { vm.showLPChangeDialog = true }
-                    ) { Text("Change LP") }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    OutlinedButton(
-                        onClick = { vm.showResetLPDialog = true }
-                    ) { Text("Reset LP") }
-                    OutlinedButton(
-                        onClick = { vm.showResetLogDialog = true }
-                    ) { Text("Reset Logs") }
+                    item {
+                        OutlinedButton(
+                            onClick = { vm.showDiceDialog = true }
+                        ) { Text("Roll Dice") }
+                    }
+                    item {
+                        OutlinedButton(
+                            onClick = { vm.showCoinFlipDialog = true }
+                        ) { Text("Flip Coin") }
+                    }
+                    item {
+                        OutlinedButton(
+                            onClick = { vm.showLPChangeDialog = true }
+                        ) { Text("Change LP") }
+                    }
+                    item {
+                        OutlinedButton(
+                            onClick = { scope.launch { drawerState.open() } }
+                        ) { Text("Card Counter") }
+                    }
+                    item {
+                        OutlinedButton(
+                            onClick = { vm.showResetLPDialog = true }
+                        ) { Text("Reset LP") }
+                    }
+                    item {
+                        OutlinedButton(
+                            onClick = { vm.showResetLogDialog = true }
+                        ) { Text("Reset Logs") }
+                    }
                 }
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(2.dp)

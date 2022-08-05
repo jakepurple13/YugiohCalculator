@@ -13,36 +13,22 @@ import kotlinx.serialization.json.Json
 object Networking {
     private const val baseUrl = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
 
-    private val client by lazy {
-        HttpClient {
-            install(ContentNegotiation) {
-                json(
-                    Json {
-                        ignoreUnknownKeys = true
-                        prettyPrint = true
-                        isLenient = true
-                    }
-                )
-            }
-            defaultRequest {
-                accept(ContentType.Application.Json)
-            }
+    private val client = HttpClient {
+        install(ContentNegotiation) {
+            json(
+                Json {
+                    ignoreUnknownKeys = true
+                    prettyPrint = true
+                    isLenient = true
+                }
+            )
+        }
+        defaultRequest {
+            accept(ContentType.Application.Json)
         }
     }
 
-    suspend fun loadCards(networkLoadingState: (NetworkLoadingState) -> Unit): List<CardInfo> {
-        return runCatching { client.get(baseUrl).body<YugiohCards>().also { println(it) } }
-            .fold(
-                onSuccess = {
-                    networkLoadingState(NetworkLoadingState.Success)
-                    it.data.orEmpty()
-                },
-                onFailure = {
-                    networkLoadingState(NetworkLoadingState.Failure)
-                    emptyList()
-                }
-            )
-    }
+    suspend fun loadCards(): List<CardInfo> = client.get(baseUrl).body<YugiohCards>().data.orEmpty()
 }
 
 enum class NetworkLoadingState { Loading, Success, Failure }
